@@ -32,6 +32,8 @@ import { RepositoryWorktreeDefaultsSection } from './repository/execution/Reposi
 import { RepositoryJiraProjectSection } from './repository/RepositoryJiraProjectSection'
 import { getProjectRuntimeSessionSummary } from './repository/execution/repository-runtime-session-summary'
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../store/worktree-visibility-defaults-by-host'
+import { TaskPromptTemplateSetting } from './TaskPromptTemplateSetting'
+import { getTaskPromptTemplateSearchEntry } from './task-prompt-template-search'
 export { getRepositoryPaneSearchEntries }
 
 type RepositoryPaneRepoUpdate = Omit<
@@ -168,6 +170,7 @@ export function RepositoryPane({
 
   const allEntries = getRepositoryPaneSearchEntries(repo, { isLocalWindowsProject })
   const identityEntryTitles = new Set([
+    getTaskPromptTemplateSearchEntry().title,
     translate('auto.components.settings.repository.search.7e1e456a95', 'Display Name'),
     translate('auto.components.settings.repository.search.b24f00294a', 'Project Icon'),
     translate('components.RepositoryJiraProjectSection.title', 'Default Jira project'),
@@ -304,6 +307,21 @@ export function RepositoryPane({
           updateRepo={updateSelectedRepo}
           forceVisible={forceFullPaneForRepoMatch}
         />
+
+        {project && updateProject ? (
+          <TaskPromptTemplateSetting
+            key={`task-prompt:${project.id}`}
+            scope="project"
+            value={project.linkedWorkItemPromptTemplate ?? ''}
+            globalTemplate={settings?.linkedWorkItemPromptTemplate}
+            commit={async (value) =>
+              (await updateProject(project.id, {
+                linkedWorkItemPromptTemplate: value.trim() ? value : null
+              })) === true
+            }
+            forceVisible={forceFullPaneForRepoMatch}
+          />
+        ) : null}
 
         {!isFolder ? (
           <>

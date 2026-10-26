@@ -26,6 +26,7 @@ import {
   notifyDirectWorkItemAgentStartTimeout
 } from '@/lib/launch-work-item-direct-agent'
 import { getDirectWorkItemDraftContent } from '@/lib/launch-work-item-direct-draft'
+import { getLinkedWorkItemPromptTemplate } from '@/lib/linked-work-item-context'
 import {
   resolveDirectPrStartPoint,
   resolveDirectLaunchOwnerRow,
@@ -156,7 +157,11 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
   let draftLaunchedNatively = false
   let plan: AgentSessionLaunchPlan | null = null
   let structuredLaunchCompleted = false
-  const draftContent = await getDirectWorkItemDraftContent(item, repoConnectionId)
+  const draftContent = await getDirectWorkItemDraftContent(
+    item,
+    repoConnectionId,
+    getLinkedWorkItemPromptTemplate(store, repoId)
+  )
   let startupPlanFailed = false
   try {
     const result = await store.createWorktree(
