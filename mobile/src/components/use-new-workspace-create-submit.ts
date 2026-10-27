@@ -38,6 +38,7 @@ type Composer = ReturnType<typeof useMobileComposerSource>
 
 export function useNewWorkspaceCreateSubmit(args: {
   client: RpcClient | null
+  repos: readonly MobileWorkspaceRepo[]
   selectedRepo: MobileWorkspaceRepo | null
   selectedAgent: NewWorktreeAgentOption
   setSelectedAgent: (agent: NewWorktreeAgentOption) => void
@@ -139,7 +140,12 @@ export function useNewWorkspaceCreateSubmit(args: {
         setupDecision === 'run' &&
         args.setupTrust &&
         args.setupTrust.contentHash !== options.approvedSetupContentHash &&
-        !isSetupHookTrusted(args.trustedOrcaHooks, selectedRepo.id, args.setupTrust.contentHash)
+        !isSetupHookTrusted(
+          args.trustedOrcaHooks,
+          args.repos,
+          selectedRepo.id,
+          args.setupTrust.contentHash
+        )
       ) {
         setSetupTrustPrompt({
           repoId: selectedRepo.id,

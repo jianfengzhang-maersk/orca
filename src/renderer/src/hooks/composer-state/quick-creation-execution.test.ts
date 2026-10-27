@@ -38,7 +38,8 @@ it('retains the accepted route and resolves project task drafts for either launc
     linkedLinearIssue: undefined,
     linkedLinearIssueWorkspaceId: undefined,
     linkedLinearIssueOrganizationUrlKey: undefined,
-    effectiveBranchNameOverride: undefined,
+    effectiveBranchNameOverride: 'feature/test',
+    branchIntent: 'open-existing',
     submitBaseBranch: undefined,
     createDisplayName: undefined,
     pendingFirstAgentMessageRename: false,
@@ -46,7 +47,11 @@ it('retains the accepted route and resolves project task drafts for either launc
   }
   const settings = { ...getDefaultSettings('/test'), experimentalNativeChat: true }
   const original = useAppStore.getState().settings
-  const originalProjects = useAppStore.getState().projects
+  const originalCatalog = {
+    repos: useAppStore.getState().repos,
+    endpointProjects: useAppStore.getState().endpointProjects,
+    endpointProjectHostSetups: useAppStore.getState().endpointProjectHostSetups
+  }
   const prepare = vi.fn<() => Promise<PreparedQuickSubmit | null>>()
   const { result } = renderHook(() =>
     useQuickCreationExecution({
@@ -106,7 +111,9 @@ it('retains the accepted route and resolves project task drafts for either launc
       expect(request).toMatchObject({
         agent: 'opencode',
         agentLaunchRoute: route,
-        quickPrompt: 'Fix the checkout'
+        quickPrompt: 'Fix the checkout',
+        branchNameOverride: 'feature/test',
+        branchIntent: 'open-existing'
       })
       if (route === 'terminal-tui') {
         expect(request.startup).toMatchObject({
@@ -121,7 +128,22 @@ it('retains the accepted route and resolves project task drafts for either launc
     const url = 'https://example.atlassian.net/browse/APP-123'
     useAppStore.setState({
       settings: { ...settings, linkedWorkItemPromptTemplate: '/global {{url}}' },
-      projects: [
+      repos: [{ id: 'repo-1', path: '/repo', displayName: 'Repo', badgeColor: '', addedAt: 1 }],
+      endpointProjectHostSetups: [
+        {
+          id: 'repo-1',
+          projectId: 'project-1',
+          repoId: 'repo-1',
+          path: '/repo',
+          displayName: 'Repo',
+          hostId: 'local',
+          setupState: 'ready',
+          setupMethod: 'legacy-repo',
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ],
+      endpointProjects: [
         {
           id: 'project-1',
           displayName: 'Repo',
@@ -157,6 +179,6 @@ it('retains the accepted route and resolves project task drafts for either launc
       })
     }
   } finally {
-    useAppStore.setState({ settings: original, projects: originalProjects })
+    useAppStore.setState({ settings: original, ...originalCatalog })
   }
 })

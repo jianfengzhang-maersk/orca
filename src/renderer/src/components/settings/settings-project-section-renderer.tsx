@@ -1,12 +1,8 @@
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import { getRepoHostIdentity } from '../../store/slices/repo-host-identity'
-import { RepositoryPane } from './RepositoryPane'
+import { RepositoryPane } from './repository/RepositoryPane'
 import { SettingsSection } from './SettingsSection'
-import {
-  getSettingsEntryHostSelection,
-  getSettingsProjectHostRepo,
-  getSettingsProjectRemovalScope
-} from './settings-project-list'
+import { getSettingsEntryHostSelection, getSettingsProjectHostRepo } from './settings-project-list'
 import { translate } from '@/i18n/i18n'
 import { getProjectPromptTemplateOwner } from '../../../../shared/project-prompt-template-owner'
 import type { SettingsRenderContext } from './settings-render-context'
@@ -69,7 +65,7 @@ export function renderProjectSettingsSections(
         title={translate(
           'auto.components.settings.Settings.3bf149e873',
           'Project Settings > {{value0}}',
-          { value0: settingsProject.checkoutLabel ?? project.displayName }
+          { value0: project.displayName }
         )}
         description={repo.path}
         searchEntries={navigation.getSectionSearchEntries(repoSectionId)}
@@ -87,13 +83,6 @@ export function renderProjectSettingsSections(
             removeProject={() => void model.removeProjectAllHosts(settingsProject.setups)}
             project={project}
             selectedProjectSetupId={hostSelection.setupId}
-            settingsSelectionKey={settingsProject.selectionKey}
-            settingsEntryRepoIds={
-              settingsProject.splitProject
-                ? new Set(settingsProject.setups.map((setup) => setup.repoId))
-                : undefined
-            }
-            removalScope={getSettingsProjectRemovalScope(settingsProject)}
             isLocalWindowsProject={
               getRepoExecutionHostId(repo) === LOCAL_EXECUTION_HOST_ID &&
               terminal.isWindowsTerminalHost

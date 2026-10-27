@@ -1,6 +1,21 @@
 import type { TaskProvider } from '../../../shared/task-providers'
-import { renderLinkedWorkItemPromptTemplate } from '../../../shared/linked-work-item-prompt-settings'
+import {
+  getLinkedWorkItemPromptTemplate,
+  renderLinkedWorkItemPromptTemplate
+} from '../../../shared/linked-work-item-prompt-settings'
+import type { AppState } from '@/store/types'
+import { selectCanonicalProjects } from '@/store/project-host-setup-selector'
 export { getLinkedWorkItemPromptTemplate } from '../../../shared/linked-work-item-prompt-settings'
+
+export function getDesktopLinkedWorkItemPromptTemplate(
+  state: AppState,
+  repoId?: string
+): string | undefined {
+  return getLinkedWorkItemPromptTemplate(
+    { settings: state.settings, projects: selectCanonicalProjects(state) },
+    repoId
+  )
+}
 
 export type LinkedWorkItemContext = {
   provider: TaskProvider

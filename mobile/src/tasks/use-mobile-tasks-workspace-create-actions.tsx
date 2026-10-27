@@ -34,6 +34,7 @@ export function useMobileTasksWorkspaceCreateActions(model: WorkspaceSshStateMod
     ensureWorkspaceSshReady,
     getWorkspaceTargetRepo,
     hostId,
+    repos,
     resolveCreateSetupDecision,
     router,
     runtimeTaskSettings,
@@ -133,6 +134,7 @@ export function useMobileTasksWorkspaceCreateActions(model: WorkspaceSshStateMod
           setupResolution.setupTrust.contentHash !== approvedSetupContentHash &&
           !isSetupHookTrusted(
             trustedOrcaHooks,
+            repos,
             targetRepo.id,
             setupResolution.setupTrust.contentHash
           )
@@ -298,6 +300,7 @@ export function useMobileTasksWorkspaceCreateActions(model: WorkspaceSshStateMod
       ensureWorkspaceSshReady,
       getWorkspaceTargetRepo,
       hostId,
+      repos,
       resolveCreateSetupDecision,
       router,
       runtimeTaskSettings,

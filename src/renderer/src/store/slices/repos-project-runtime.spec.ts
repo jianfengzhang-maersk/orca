@@ -6,6 +6,8 @@ import {
   createCompatibleRuntimeStatusResponseIfNeeded,
   type RuntimeEnvironmentCallRequest
 } from '../../runtime/runtime-compatibility-test-fixture'
+import { getProjectHostSetupProjectionFromState } from '../project-host-setup-selector'
+import { projectHostSetupProjectionFromRepos } from '../../../../shared/project-host-setup-projection'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
 
 export function registerReposProjectRuntimeTests(): void {
@@ -85,19 +87,19 @@ export function registerReposProjectRuntimeTests(): void {
       const { linkedWorkItemPromptTemplate: _template, ...withoutTemplate } = project
       projectsUpdate.mockResolvedValue(withoutTemplate)
       const store = createTestStore()
-      store.setState({ projects: [project] })
+      store.setState({ endpointProjects: [project] })
       expect(
         await store
           .getState()
           .updateProject(project.id, { linkedWorkItemPromptTemplate: '{url} /new' }, 'local')
       ).toBe(false)
-      expect(store.getState().projects[0]?.linkedWorkItemPromptTemplate).toBe('{url} /old')
+      expect(store.getState().endpointProjects[0]?.linkedWorkItemPromptTemplate).toBe('{url} /old')
       expect(
         await store
           .getState()
           .updateProject(project.id, { linkedWorkItemPromptTemplate: null }, 'local')
       ).toBe(true)
-      expect(store.getState().projects[0]?.linkedWorkItemPromptTemplate).toBeUndefined()
+      expect(store.getState().endpointProjects[0]?.linkedWorkItemPromptTemplate).toBeUndefined()
     })
 
     it('clears local runtime-scoped detection state when project runtime changes', async () => {
@@ -115,7 +117,7 @@ export function registerReposProjectRuntimeTests(): void {
       })
       const store = createTestStore()
       store.setState({
-        projects: [project],
+        endpointProjects: [project],
         detectedAgentIds: ['claude'],
         isDetectingAgents: true,
         isRefreshingAgents: true
@@ -133,6 +135,68 @@ export function registerReposProjectRuntimeTests(): void {
       expect(store.getState().isDetectingAgents).toBe(false)
       expect(store.getState().isRefreshingAgents).toBe(false)
       expectInstalledSkillRefreshEvent()
+    })
+
+    it('updates an old endpoint by its concrete advertised project and rehydrates the split view', async () => {
+      const repos = ['a', 'b'].map((id, index) => ({
+        ...localRepo,
+        id,
+        path: `/${id}`,
+        addedAt: index + 1,
+        executionHostId: 'runtime:old' as const,
+        upstream: { owner: 'acme', repo: 'app' }
+      }))
+      const projection = projectHostSetupProjectionFromRepos(repos)
+      const rawProject = {
+        ...projection.projects[0],
+        id: 'github:acme/app',
+        sourceRepoIds: ['a', 'b']
+      }
+      runtimeEnvironmentCall.mockImplementation(async (args) => {
+        expect(args).toMatchObject({
+          selector: 'old',
+          method: 'project.update',
+          params: {
+            projectId: rawProject.id,
+            updates: { localWindowsRuntimePreference: { kind: 'windows-host' } }
+          }
+        })
+        return {
+          id: 'update',
+          ok: true,
+          result: {
+            project: { ...rawProject, localWindowsRuntimePreference: { kind: 'windows-host' } }
+          }
+        }
+      })
+      const store = createTestStore()
+      store.setState({
+        repos,
+        endpointProjects: [rawProject],
+        endpointProjectHostSetups: projection.setups.map((setup) => ({
+          ...setup,
+          projectId: rawProject.id
+        }))
+      })
+      expect(
+        await store
+          .getState()
+          .updateProject(
+            'repo:b',
+            { localWindowsRuntimePreference: { kind: 'windows-host' } },
+            'runtime:old'
+          )
+      ).toBe(true)
+      const view = getProjectHostSetupProjectionFromState(store.getState())
+      expect(view.setups.find((setup) => setup.repoId === 'b')?.projectId).toBe('repo:b')
+      expect(
+        view.projects.find((project) => project.id === 'repo:b')?.localWindowsRuntimePreference
+      ).toEqual({ kind: 'windows-host' })
+      expect(
+        store
+          .getState()
+          .endpointProjectHostSetups.every((setup) => setup.projectId === rawProject.id)
+      ).toBe(true)
     })
 
     it('hydrates projects from local IPC when the project API is available', async () => {
@@ -163,8 +227,8 @@ export function registerReposProjectRuntimeTests(): void {
 
       await store.getState().fetchRepos(catalogOwner(store))
 
-      expect(store.getState().projects).toEqual([project])
-      expect(store.getState().projectHostSetups).toEqual([setup])
+      expect(store.getState().endpointProjects).toEqual([project])
+      expect(store.getState().endpointProjectHostSetups).toEqual([setup])
       expect(projectsList).toHaveBeenCalled()
       expect(window.api.projects.listHostSetups).toHaveBeenCalled()
     })
@@ -203,11 +267,11 @@ export function registerReposProjectRuntimeTests(): void {
       window.api.projects.listHostSetups = vi.fn().mockResolvedValue([setup])
       reposList.mockResolvedValue([localRepo])
       const store = createTestStore()
-      store.setState({ projects: [staleProject], projectHostSetups: [setup] })
+      store.setState({ endpointProjects: [staleProject], endpointProjectHostSetups: [setup] })
 
       await store.getState().fetchRepos(catalogOwner(store))
 
-      expect(store.getState().projects[0]?.localWindowsRuntimePreference).toBeUndefined()
+      expect(store.getState().endpointProjects[0]?.localWindowsRuntimePreference).toBeUndefined()
     })
 
     it('updates local project runtime preferences through the projects API', async () => {
@@ -224,7 +288,7 @@ export function registerReposProjectRuntimeTests(): void {
         localWindowsRuntimePreference: { kind: 'windows-host' }
       })
       const store = createTestStore()
-      store.setState({ projects: [project] })
+      store.setState({ endpointProjects: [project] })
 
       await store.getState().updateProject(
         project.id,
@@ -234,7 +298,7 @@ export function registerReposProjectRuntimeTests(): void {
         'local'
       )
 
-      expect(store.getState().projects[0]?.localWindowsRuntimePreference).toEqual({
+      expect(store.getState().endpointProjects[0]?.localWindowsRuntimePreference).toEqual({
         kind: 'windows-host'
       })
       expect(projectsUpdate).toHaveBeenCalledWith({
@@ -260,8 +324,8 @@ export function registerReposProjectRuntimeTests(): void {
       const store = createTestStore()
       store.setState({
         settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
-        projects: [project],
-        projectHostSetups: [
+        endpointProjects: [project],
+        endpointProjectHostSetups: [
           {
             id: 'setup-1',
             projectId: project.id,
@@ -315,8 +379,8 @@ export function registerReposProjectRuntimeTests(): void {
       const store = createTestStore()
       store.setState({
         settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
-        projects: [project],
-        projectHostSetups: [
+        endpointProjects: [project],
+        endpointProjectHostSetups: [
           {
             id: 'setup-1',
             projectId: project.id,
@@ -340,7 +404,7 @@ export function registerReposProjectRuntimeTests(): void {
         'runtime:env-1'
       )
 
-      expect(store.getState().projects[0]?.localWindowsRuntimePreference).toEqual({
+      expect(store.getState().endpointProjects[0]?.localWindowsRuntimePreference).toEqual({
         kind: 'wsl',
         distro: 'Ubuntu'
       })
@@ -374,7 +438,7 @@ export function registerReposProjectRuntimeTests(): void {
         localWindowsRuntimePreference: { kind: 'windows-host' }
       })
       const store = createTestStore()
-      store.setState({ projects: [project] })
+      store.setState({ endpointProjects: [project] })
 
       await store.getState().updateProject(
         project.id,
@@ -384,8 +448,8 @@ export function registerReposProjectRuntimeTests(): void {
         'local'
       )
 
-      expect(store.getState().projects[0]?.createdAt).toBe(100)
-      expect(store.getState().projects[0]?.updatedAt).toBe(100)
+      expect(store.getState().endpointProjects[0]?.createdAt).toBe(100)
+      expect(store.getState().endpointProjects[0]?.updatedAt).toBe(100)
     })
 
     it('preserves shared project source repos when updating local runtime preferences', async () => {
@@ -404,7 +468,7 @@ export function registerReposProjectRuntimeTests(): void {
         updatedAt: 3
       })
       const store = createTestStore()
-      store.setState({ projects: [project] })
+      store.setState({ endpointProjects: [project] })
 
       await store.getState().updateProject(
         project.id,
@@ -414,8 +478,11 @@ export function registerReposProjectRuntimeTests(): void {
         'local'
       )
 
-      expect(store.getState().projects[0]?.sourceRepoIds).toEqual(['local-repo', 'remote-repo'])
-      expect(store.getState().projects[0]?.localWindowsRuntimePreference).toEqual({
+      expect(store.getState().endpointProjects[0]?.sourceRepoIds).toEqual([
+        'local-repo',
+        'remote-repo'
+      ])
+      expect(store.getState().endpointProjects[0]?.localWindowsRuntimePreference).toEqual({
         kind: 'windows-host'
       })
     })
@@ -439,7 +506,7 @@ export function registerReposProjectRuntimeTests(): void {
         updatedAt: 3
       })
       const store = createTestStore()
-      store.setState({ projects: [project] })
+      store.setState({ endpointProjects: [project] })
 
       await store.getState().updateProject(
         project.id,
@@ -449,8 +516,11 @@ export function registerReposProjectRuntimeTests(): void {
         'local'
       )
 
-      expect(store.getState().projects[0]?.sourceRepoIds).toEqual(['local-repo', 'remote-repo'])
-      expect(store.getState().projects[0]?.localWindowsRuntimePreference).toBeUndefined()
+      expect(store.getState().endpointProjects[0]?.sourceRepoIds).toEqual([
+        'local-repo',
+        'remote-repo'
+      ])
+      expect(store.getState().endpointProjects[0]?.localWindowsRuntimePreference).toBeUndefined()
     })
   })
 

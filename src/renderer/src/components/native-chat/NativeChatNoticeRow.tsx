@@ -1,3 +1,4 @@
+import { agentSessionGoalControlWords } from './agent-session-goal-control-words'
 import { AlertCircle, AlertTriangle, Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { CommentMarkdownLinkClickHandler } from '@/components/sidebar/CommentMarkdown'
@@ -25,7 +26,10 @@ import {
   nativeChatClaudeSignInLabel,
   useNativeChatClaudeSignInView
 } from './native-chat-claude-sign-in'
-import { readWholeAgentSessionFailureFact } from '../../../../shared/agent-session-failure'
+import {
+  agentSessionFailureDetailText,
+  readWholeAgentSessionFailureFact
+} from '../../../../shared/agent-session-failure'
 import { agentSessionFailureSentence } from '../../../../shared/agent-session-failure-words'
 import { sayAgentSessionFailureTranslated } from './agent-session-failure-words-text'
 import { nativeChatAntigravitySignInContent } from './native-chat-antigravity-settings'
@@ -171,11 +175,9 @@ export function NativeChatNoticeRow({
             { agentName },
             sayAgentSessionFailureTranslated
           )
-        : block.text
-  const detail =
-    failure?.detail?.audience === 'person' && failure.detail.text.trim() !== text.trim()
-      ? failure.detail.text
-      : undefined
+        : agentSessionGoalControlWords(block.text)
+  const failureDetail = agentSessionFailureDetailText(failure)
+  const detail = failureDetail?.trim() !== text.trim() ? failureDetail : undefined
   const tone = named ? 'notice' : look.kind === 'line' ? look.tone : null
   const Icon =
     tone === 'warning'
