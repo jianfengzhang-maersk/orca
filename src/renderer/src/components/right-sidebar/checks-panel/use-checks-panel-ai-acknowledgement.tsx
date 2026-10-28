@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { mergePRCommentIntoList } from '@/store/github/pr-comment-cache'
+import { trackGitHubMutationCacheWrite } from '@/store/github/request-coordination'
 import {
   acknowledgePRCommentsAfterAiLaunch,
   attachPRReviewReplyParent,
@@ -90,8 +91,13 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
       clearSentCommentSelection(resolution.reviewContextKey)
       // Ignore headSha churn; abort only when the user leaves this review/panel.
       const launchStableKey = checksPanelReviewStableKey(resolution.reviewContextKey)
+      const cacheWrite =
+        resolution.provider === 'github'
+          ? trackGitHubMutationCacheWrite(resolution.reviewContextKey)
+          : null
       // Host calls keep the snapshotted target; gate UI writes so replies cannot appear in another review.
       const isPanelStillOnLaunchReview = (): boolean =>
+        cacheWrite?.isCurrent() !== false &&
         checksPanelReviewStableKey(asyncResultKeyRef.current) === launchStableKey
       const githubTarget = resolution.githubTarget
       const canReplyOnHost = resolution.provider === 'github' && githubTarget != null
@@ -208,7 +214,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
             }
           }
         }
-      })
+      }).finally(cacheWrite?.dispose)
 
       if (isPanelStillOnLaunchReview()) {
         await refreshCommentsRef.current(resolution.provider)

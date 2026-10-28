@@ -4,6 +4,7 @@ import { githubHostExecOptions, type GitHubApiRepository } from '../../github-ap
 import { githubRepoIdentityKey } from '../../../../shared/github/repository-identity-key'
 import { noteRepositoryRateLimitSpend, repositoryRateLimitGuard } from '../../rate-limit'
 import type { GhExecOptions } from './../github-exec-scope'
+import { githubReadExecutionScope } from '../../github-read-execution-scope'
 import {
   MERGE_QUEUE_CACHE_TTL_MS,
   MERGE_QUEUE_UNKNOWN_CACHE_TTL_MS,
@@ -18,7 +19,7 @@ export async function detectRepositoryMergeMetadata(
   ghOptions: GhExecOptions,
   executionScope: string | undefined = 'default'
 ): Promise<GitHubRepositoryMergeMetadata> {
-  const cacheKey = `${executionScope ?? 'default'}\0${githubRepoIdentityKey(ownerRepo)}:${branchName ?? '__repo__'}`
+  const cacheKey = `${executionScope ?? 'default'}\0${githubReadExecutionScope(ghOptions)}\0${githubRepoIdentityKey(ownerRepo)}:${branchName ?? '__repo__'}`
   pruneRepositoryMergeMetadataCache()
   const cached = repositoryMergeMetadataCache.get(cacheKey)
   if (cached) {

@@ -19,6 +19,7 @@ import { clearPendingPRCommentAiAck } from '../pr-comments-ai-launch-ack'
 import type { PRComment } from '../../../../../shared/github/comment-types'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
+import { trackGitHubMutationCacheWrite } from '@/store/github/request-coordination'
 import { worktreeLaunchWorkspace } from '@/lib/agent-launch-route-input'
 
 type ChecksPanelCommentResolutionInput = Pick<
@@ -116,11 +117,12 @@ export function useChecksPanelCommentResolution(model: ChecksPanelCommentResolut
         previousThreadComments = prev.filter((comment) => comment.threadId === threadId)
         return markPRCommentThreadResolved(prev, threadId, resolve)
       })
+      const cacheWrite = trackGitHubMutationCacheWrite(prCacheKey)
       const ok = await resolveReviewThread(repo.path, prNumber, threadId, resolve, {
         repoId: repo.id,
         prRepo: pr?.prRepo
-      })
-      if (!isCurrentAsyncResult(requestKey)) {
+      }).finally(cacheWrite.dispose)
+      if (!cacheWrite.isCurrent() || !isCurrentAsyncResult(requestKey)) {
         return ok
       }
       if (!ok) {

@@ -113,6 +113,10 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
     fields: attachFingerprintFields({ ...resolved, envelope: args.envelope })
   })
   host ??= await args.ensureHost()
+  await args.runtime.bindStructuredSessionGitHubParticipant?.(
+    args.worktree,
+    args.envelope.sessionId
+  )
   const priorOperation =
     args.atRest === undefined
       ? null
@@ -147,7 +151,6 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
       ? { ...resolved.options, ...args.options }
       : { ...seededPermissionMode(resolved.options), ...args.options }
     : resolved.options
-  // Resolve picker cwd once so seed selection and host admission read the same catalog.
   let folder: Promise<string | null> | undefined
   const catalogFolder = () =>
     (folder ??= args.runtime

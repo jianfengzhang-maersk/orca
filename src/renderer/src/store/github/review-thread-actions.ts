@@ -3,6 +3,7 @@ import type { AppState } from '../types'
 import type { GitHubSlice } from './slice-types'
 import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
 import { prCommentsCacheSuffix, sourceScopedRepoCacheKey } from './cache-identity'
+import { trackGitHubMutationCacheWrite } from './request-coordination'
 import {
   getGitHubRepoSourceSettings,
   getGitHubSourceTarget,
@@ -51,6 +52,7 @@ export const createReviewThreadActions = (
       repoPath,
       options?.sourceContext
     )
+    const cacheWrite = trackGitHubMutationCacheWrite(cacheKey)
     let ok = false
     try {
       ok =
@@ -77,8 +79,10 @@ export const createReviewThreadActions = (
     } catch (err) {
       console.error('Failed to update review thread:', err)
       ok = false
+    } finally {
+      cacheWrite.dispose()
     }
-    if (!ok && prev) {
+    if (!ok && prev && cacheWrite.isCurrent()) {
       set((s) => ({
         commentsCache: {
           ...s.commentsCache,
