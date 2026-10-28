@@ -118,25 +118,29 @@ export function useChecksPanelCommentResolution(model: ChecksPanelCommentResolut
         return markPRCommentThreadResolved(prev, threadId, resolve)
       })
       const cacheWrite = trackGitHubMutationCacheWrite(prCacheKey)
-      const ok = await resolveReviewThread(repo.path, prNumber, threadId, resolve, {
-        repoId: repo.id,
-        prRepo: pr?.prRepo
-      }).finally(cacheWrite.dispose)
-      if (!cacheWrite.isCurrent() || !isCurrentAsyncResult(requestKey)) {
-        return ok
-      }
-      if (!ok) {
-        rollbackThread(previousThreadComments)
-        if (notifyOnFailure) {
-          toast.error(
-            translate(
-              'auto.components.right.sidebar.ChecksPanel.5788d1059d',
-              'Could not update review thread. Check the GitHub API budget.'
-            )
-          )
+      try {
+        const ok = await resolveReviewThread(repo.path, prNumber, threadId, resolve, {
+          repoId: repo.id,
+          prRepo: pr?.prRepo
+        })
+        if (!cacheWrite.isCurrent() || !isCurrentAsyncResult(requestKey)) {
+          return ok
         }
+        if (!ok) {
+          rollbackThread(previousThreadComments)
+          if (notifyOnFailure) {
+            toast.error(
+              translate(
+                'auto.components.right.sidebar.ChecksPanel.5788d1059d',
+                'Could not update review thread. Check the GitHub API budget.'
+              )
+            )
+          }
+        }
+        return ok
+      } finally {
+        cacheWrite.dispose()
       }
-      return ok
     },
     [
       activeGitLabReview,

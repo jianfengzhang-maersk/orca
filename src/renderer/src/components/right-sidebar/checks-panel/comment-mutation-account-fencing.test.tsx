@@ -55,13 +55,13 @@ afterEach(() => {
   Object.defineProperty(window, 'api', { configurable: true, value: initialApi })
 })
 
-it.each(['conversation', 'reply', 'reaction'] as const)(
+it.each(['conversation', 'reply', 'reaction', 'settled conversation'] as const)(
   'does not restore old-account %s state after the same review reloads',
   async (kind) => {
     const receipt = Promise.withResolvers<GitHubCommentResult>()
     const reaction = Promise.withResolvers<boolean>()
     const { result } = renderHook(() => {
-      const [comments, setComments] = useState([alice])
+      const [comments, setComments] = useState<PRComment[]>([alice])
       const actions = useChecksPanelCommentMutations({
         repo,
         pr,
@@ -82,16 +82,25 @@ it.each(['conversation', 'reply', 'reaction'] as const)(
     let pending: Promise<unknown> | undefined
     act(() => {
       pending =
-        kind === 'conversation'
+        kind === 'conversation' || kind === 'settled conversation'
           ? result.current.handleAddPRComment('Hello')
           : kind === 'reply'
             ? result.current.handleReplyToComment(alice, 'Hello')
             : result.current.handleSetReaction(alice, '+1', false)
     })
-    act(() => {
-      evict()
-      result.current.setComments([bob])
-    })
+    if (kind === 'settled conversation') {
+      void receipt.promise.then(() =>
+        queueMicrotask(() => {
+          evict()
+          result.current.setComments([bob])
+        })
+      )
+    } else {
+      act(() => {
+        evict()
+        result.current.setComments([bob])
+      })
+    }
     await act(async () => {
       receipt.resolve({ ok: true, comment: { ...alice, id: 2 } })
       reaction.resolve(false)
@@ -104,7 +113,7 @@ it.each(['conversation', 'reply', 'reaction'] as const)(
 it('does not restore an old thread snapshot into the same review under a new account', async () => {
   const pending = Promise.withResolvers<boolean>()
   const { result } = renderHook(() => {
-    const [comments, setComments] = useState([alice])
+    const [comments, setComments] = useState<PRComment[]>([alice])
     const actions = useChecksPanelCommentResolution({
       repo,
       pr,
@@ -157,7 +166,7 @@ it.each(['edit', 'delete'] as const)(
       }
     })
     const { result } = renderHook(() => {
-      const [comments, setComments] = useState([conversation])
+      const [comments, setComments] = useState<PRComment[]>([conversation])
       const actions = useChecksPanelCommentMutations({
         repo,
         pr,
@@ -198,7 +207,7 @@ it.each(['edit', 'delete'] as const)(
 it('keeps an AI acknowledgement receipt out of the next account comments', async () => {
   const receipt = Promise.withResolvers<GitHubCommentResult>()
   const { result } = renderHook(() => {
-    const [comments, setComments] = useState([conversation])
+    const [comments, setComments] = useState<PRComment[]>([conversation])
     const actions = useChecksPanelAiAcknowledgement({
       addPRConversationComment: () => receipt.promise,
       addPRReviewCommentReply: vi.fn(),

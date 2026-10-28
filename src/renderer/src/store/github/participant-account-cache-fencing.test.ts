@@ -172,7 +172,7 @@ it('drops pending PR and check cache writes after account eviction', async () =>
     .getState()
     .fetchPRChecks('/repo', 1, 'main', undefined, undefined, { repoId: 'repo-1' })
   store.getState().evictGitHubRepoCaches('repo-1', '/repo', 'local')
-  oldPR.resolve({ kind: 'found', pr: makePR(), fetchedAt: Date.now() })
+  oldPR.resolve({ kind: 'found', pr: makePR(), fetchedAt: 1_800_000_000_000 })
   oldChecks.resolve([])
   await Promise.all([pr, checks])
   expect(store.getState().prCache).toEqual({})
