@@ -33,10 +33,10 @@ import {
 let pendingQualification: { directory: string; key: string } | null = null
 
 /** Qualify packaged startup before touching profile indexes, data-root locks or imports. */
-export async function preflightBundledOrcadStartup(): Promise<void> {
+export async function preflightBundledOrcadStartup(): Promise<boolean> {
   const directory = resolveBundledOrcadSlot()
   if (!isRunningAsBundledOrcadRuntime(directory)) {
-    return
+    return false
   }
   const identity = await readInstalledVersion(directory)
   // Windows' child also proves the process identity table, which depends on host services.
@@ -46,7 +46,7 @@ export async function preflightBundledOrcadStartup(): Promise<void> {
       : await orcadStartupQualificationKey(directory, identity).catch(() => null)
   if (key && (await consumeOrcadStartupQualification(directory, key))) {
     pendingQualification = { directory, key }
-    return
+    return true
   }
   try {
     await runStartupPreflightChild(directory, identity)
@@ -57,6 +57,12 @@ export async function preflightBundledOrcadStartup(): Promise<void> {
     throw error
   }
   pendingQualification = key ? { directory, key } : null
+  return false
+}
+
+/** A launch whose node-pty probe did not pass must not let the next one skip either probe. */
+export function forgetBundledOrcadStartupQualification(): void {
+  pendingQualification = null
 }
 
 async function runStartupPreflightChild(directory: string, identity: string): Promise<void> {
@@ -95,7 +101,7 @@ export async function confirmBundledOrcadStartupQualified(): Promise<void> {
 
 export async function runOrcadProfilePreflight(
   nonce: string | undefined,
-  options: { nativeFeatures?: boolean } = {}
+  options: { nativeFeatures?: boolean; servedUserDataPath?: string } = {}
 ): Promise<void> {
   const checkedNonce = z.string().uuid().parse(nonce)
   const directory = resolveBundledOrcadSlot()
@@ -118,9 +124,31 @@ export async function runOrcadProfilePreflight(
     runtime: 'node',
     runtimeVersion: process.versions.node,
     artifactVersion,
-    ...result
+    ...result,
+    ...(options.servedUserDataPath === undefined
+      ? {}
+      : { liveDaemonProtocols: await readServedDaemonProtocols(options.servedUserDataPath) })
   }
   console.log(JSON.stringify(response))
+}
+
+/** The served data root, never this probe's own, decides which daemons a restart must reach. */
+async function readServedDaemonProtocols(servedUserDataPath: string): Promise<number[] | null> {
+  // A failed probe leaves the crossing unverifiable; it must not fail the candidate itself.
+  try {
+    // Import lazily: startup preflight loads this module and needs no daemon code.
+    const [{ listLiveDaemonProtocols }, { daemonRuntimeDirFor }, protocol] = await Promise.all([
+      import('../daemon/daemon-generation-liveness'),
+      import('../daemon/daemon-runtime-dir'),
+      import('../daemon/daemon-protocol-version')
+    ])
+    return await listLiveDaemonProtocols(daemonRuntimeDirFor(servedUserDataPath), [
+      protocol.PROTOCOL_VERSION,
+      ...protocol.PREVIOUS_DAEMON_PROTOCOL_VERSIONS
+    ])
+  } catch {
+    return null
+  }
 }
 
 async function readInstalledVersion(directory: string): Promise<string> {
