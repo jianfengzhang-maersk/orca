@@ -12,7 +12,7 @@ import * as providerSupport from './structured-agent-session-provider-support'
 import * as reveal from './structured-agent-session-reveal'
 import { structuredAgentSessionOwnerStatus } from './structured-agent-session-owner-status'
 import { StructuredAgentSessionHostRuntimeState } from './structured-agent-session-host-runtime-state'
-import { structuredAgentSessionEntryDelegates } from './structured-agent-session-create'
+import { structuredAgentSessionEntryDelegates } from './structured-agent-session-entry'
 import type { StructuredAgentSessionLifetimeContext } from './structured-agent-session-host-lifetime'
 import * as agentStart from './structured-agent-session-agent-start'
 import { createStructuredAgentSessionHostMutationContext } from './structured-agent-session-host-mutation-wiring'
@@ -248,6 +248,7 @@ export class StructuredAgentSessionHost {
   private readonly entry = structuredAgentSessionEntryDelegates(() => this.attachContext())
   attach = this.entry.attach
   create = this.entry.create
+  fork = this.entry.fork
 
   /** Test-only barrier for streamed event writes. */
   flushStreamedEvents = (id: string): Promise<void> => this.runtimeState.flushEventSink(id)
